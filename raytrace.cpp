@@ -20,8 +20,8 @@ const mat4 Ellipsoid = mat4 (vec4(1,0,0,0),
 
 const mat4 Paraboloid = mat4 (vec4(1,0,0,0),
 							 vec4(0,1,0,0),
-							 vec4(0,0,0,1),
-							 vec4(0,0,1, 0));
+							 vec4(0,0,0,0.5),
+							 vec4(0,0,0.5, 0));
 
 const mat4 Hyperboloid = mat4 (vec4(1,0,0,0),
 							  vec4(0,1,0,0),
@@ -91,6 +91,8 @@ public:
 	virtual Hit intersect(const Ray& ray) = 0;
 };
 
+
+
 class Quadratic : public Intersectable{
 	mat4 Q;
 	vec3 center;			//TODO forgatás transzformáció
@@ -128,7 +130,8 @@ public:
 					  vec4(0,0, radius.z,0),
 					  vec4(0,0,0,1));
 
-		Q = invert(M) * q * invert(M);
+		//Q = invert(M) * q * invert(M);
+		Q = invert(ScaleMatrix(radius)) * q * invert(ScaleMatrix(radius));
 		Q = TranslateMatrix(center) * Q * transpose(TranslateMatrix(center));
 
 	}
@@ -254,14 +257,27 @@ public:
 
 };
 
-class Hyperboloid : public Quadratic{
+class Hyperboloid : public Intersectable{
 	mat4 Q;
 	vec3 center;			//TODO forgatás transzformáció
 	vec3 radius;
 	vec3 cutterPlane1;
 	vec3 cutterPlane2;
 
-	vec3 normalVector(vec3 plane){
+	float f(vec4 r){
+		return dot(r * Q, r);
+	}
+
+	float f2(vec4 r, vec4 n){
+		return dot(r * Q, n);
+	}
+
+	vec3 gradf(vec4 r) {
+		vec4 g = r * Q * 2;
+		return vec3(g.x, g.y, g.z);
+
+	}
+		vec3 normalVector(vec3 plane){
 		vec3 P1 = vec3(3,4, plane.z);
 		vec3 P2 = vec3(5,6, plane.z);
 		vec3 P3= vec3(6,3, plane.z);
@@ -280,7 +296,7 @@ class Hyperboloid : public Quadratic{
 
 
 public:
-	Hyperboloid(const vec3& _center, const vec3& _radius, Material* _material, mat4 q, const vec3& _p1, const vec3& _p2): Quadratic(_center, _radius, _material, q) {
+	Hyperboloid(const vec3& _center, const vec3& _radius, Material* _material, mat4 q, const vec3& _p1, const vec3& _p2){
 		center = _center;
 		radius = _radius;
 		material = _material;
@@ -292,7 +308,10 @@ public:
 					  vec4(0,0, radius.z,0),
 					  vec4(0,0,0,1));
 
-		Q = invert(M) * q * invert(M);
+		Q = q;
+
+		//Q = invert(M) * q * invert(M);
+		Q = invert(ScaleMatrix(radius)) * q * invert(ScaleMatrix(radius));
 		Q = TranslateMatrix(center) * Q * transpose(TranslateMatrix(center));
 	}
 
@@ -382,7 +401,7 @@ public:
 		Q = TranslateMatrix(center) * Q * transpose(TranslateMatrix(center));
 	}
 
-	Hit intersect(const Ray& ray){
+	Hit intersect(const Ray& ray) override{
 
 
 		vec4 start = vec4(ray.start.x, ray.start.y, ray.start.z, 1);
@@ -429,7 +448,7 @@ public:
 
 class Room : public Quadratic{
 	mat4 Q;
-	vec3 center;			//TODO forgatás transzformáció
+	vec3 center;
 	vec3 radius;
 	vec3 cutterPlane1;
 
@@ -490,12 +509,11 @@ public:
 		float p1 = planeEquation(ray.start + ray.dir * t1, cutterPlane1);
 
 
-		if(!(p1 < 0)) t1 = -1;
+		if((p1 > 0)) t1 = -1;
 
 		float f1 = planeEquation(ray.start + ray.dir * t2, cutterPlane1);
 
-		if(!(f1 < 0 )) t2 = -1;
-
+		if((f1 > 0 )) t2 = -1;
 
 		if (t1 <= 0 && t2 <= 0)
 			return hit;
@@ -503,9 +521,10 @@ public:
 		hit.t = (t2 > 0) ? t2 : t1;
 
 		hit.position = ray.start + ray.dir * hit.t;
-		vec4 r = vec4(hit.position.x, hit.position.y, hit.position.z, 1);
+		vec4 r = vec4(hit.position.x * -1, hit.position.y * -1, hit.position.z * -1, -1);
 		vec3 g = gradf(r);
 		hit.normal = normalize(vec3(g.x, g.y, g.z));
+		//hit.normal = hit.normal * -1;
 		hit.material = material;
 		return hit;
 
@@ -550,33 +569,46 @@ class Scene {
 	std::vector<Intersectable *> objects;
 	std::vector<Light *> lights;
 	Camera camera;
-	vec3 La;
+	vec3 La, Le;
+	vec3 lightDirection;
 public:
 	void build() {
-		vec3 eye = vec3(0, 1.8f, 0), vup = vec3(0, 0, 1), lookat = vec3(0, 0, 0);
+		vec3 eye = vec3(0,1.8, 0), vup = vec3(0, 0, 1), lookat = vec3(0, 0, 0);
 		float fov = 70 * M_PI / 180;
 		camera.set(eye, lookat, vup, fov);
 
-		La = vec3(0.4f, 0.4f, 0.4f);
-		vec3 lightDirection(1, 1, 1), Le(2, 2, 2);
+		La = vec3(0.4f, 0.4f, 0.6f);
+		Le = vec3(1, 1, 1);
+		lightDirection = vec3(0, 0, 1);
 		lights.push_back(new Light(lightDirection, Le));
 
-		vec3 kd(0.3f, 0.2f, 1.0f), ks(2, 2, 2);
-		vec3 kd2(0.3f, 0.2f, 0.1f), ks2(2, 2, 2);
-		vec3 kd3(0.3f, 0.7f, 0.1f), ks3(2, 2, 2);
+		vec3 kd(0.3f, 0.2f, 1.0f), ks(1, 1, 1);
+		vec3 kd2(0.3f, 0.2f, 0.1f), ks2(1, 1, 1);
+		vec3 kd3(0.8f, 0.1f, 0.1f), ks3(1, 1, 1);
 
 		Material * material1 = new RoughMaterial(kd, ks, 50);
 		Material * material2 = new RoughMaterial(kd2, ks2, 50);
 		Material * material3 = new RoughMaterial(kd3, ks3, 50);
 
-		vec3 n(1, 1, 1), kappa(5, 4, 3);
-		Material * material4 = new ReflectiveMaterial(n, kappa);
+		vec3 n(0.17, 0.35, 1.5), kappa(3.1, 2.7, 1.9);
+		Material * gold = new ReflectiveMaterial(n, kappa);
 
-		objects.push_back(new class Room(vec3(0.0f, 0.0f, 0.0f),  vec3(1.0f, 2.0f, 1.0f), material2, Ellipsoid, vec3(0,0, 0.95)));
-		objects.push_back(new class Cylinder(vec3(-0.05f, -0.1f, 0.0f),  vec3(0.2f, 0.2f, 0.2f), material1, Cylinder, vec3(0,0, 0.5),vec3(0,0, -0.5)));
-		objects.push_back(new class Paraboloid(vec3(0.55f, 0.05f, 0.0f),  vec3(0.3f, 0.3f, 0.8f), material4, Paraboloid, vec3(0,0, -0.5)));
+		vec3 n2(0.14, 0.16, 0.13), kappa2(4.1, 2.3, 3.1);
+		Material * silver = new ReflectiveMaterial(n2, kappa2);
 
-		objects.push_back(new class Hyperboloid(vec3(-0.35f, -0.65f, 0.0f),  vec3(0.1f, 0.1f, 0.3f), material3, Hyperboloid, vec3(0,0, 0.6),vec3(0,0, -0.5)));
+		objects.push_back(new class Room(vec3(0.0f, 0.0f, 0.0f),  vec3(2.0f, 2.0f, 1.0f), material2, Ellipsoid, vec3(0,0, 0.95)));
+
+
+		objects.push_back(new class Cylinder(vec3(0.5f, -0.1f, -0.2f),  vec3(0.1f, 0.1f, 0.1f), material1, Cylinder, vec3(0,0, 0.3),vec3(0,0, -0.5)));
+		objects.push_back(new class Cylinder(vec3(-0.5f, -0.1f, -0.2f),  vec3(0.1f, 0.1f, 0.1f), material1, Cylinder, vec3(0,0, 0.3),vec3(0,0, -0.5)));
+
+		objects.push_back(new class Paraboloid(vec3(0.0f, 0.0f, -0.5f),  vec3(0.6f, 0.6f, 1.0f), gold, Paraboloid, vec3(0,0, -0.5)));
+
+		objects.push_back(new class Quadratic(vec3(0.0f, -0.6f, 0.5f),  vec3(0.4f, 0.2f, 0.2f), material3, Ellipsoid));
+
+		//objects.push_back(new class Hyperboloid(vec3(0.0f, -1.0f, -0.0f),  vec3(1.0f, 1.0f, 1.0f), material3, Hyperboloid, vec3(0,0, 0.1),vec3(0,0, -0.5)));
+
+		objects.push_back(new class Hyperboloid(vec3(0.0f, 0.0f, -0.95f),  vec3(0.6244f, 0.6244f, 1.0f), silver, Hyperboloid, vec3(0.0f, 0.0f, 2.0f), vec3(0.0f, 0.0f, 0.95f)));
 
 	}
 
@@ -600,18 +632,43 @@ public:
 		return bestHit;
 	}
 
-	bool shadowIntersect(Ray ray) {	// for directional lights
-		for (Intersectable * object : objects) if (object->intersect(ray).t > 0) return true;
+	bool shadowIntersect(Ray ray) {    // for directional lights
+		int cnt = 0;
+		for (Intersectable *object : objects) {
+			if (object->intersect(ray).t > 0)
+				return true;
+			cnt++;
+		}
 		return false;
 	}
 
+
+
+
 	vec3 trace(Ray ray, int depth = 0) {
+
+		std::vector<vec3> controlPoints;
+		controlPoints.push_back(vec3(0, 0, 0.95));
+		controlPoints.push_back(vec3(0.1, 0.1, 0.95));
+		controlPoints.push_back(vec3(-0.1, 0.1, 0.95));
+		controlPoints.push_back(vec3(-0.1, -0.1, 0.95));
+		controlPoints.push_back(vec3(0.1, -0.1, 0.95));
+		controlPoints.push_back(vec3(0.3, 0.3, 0.95));
+		controlPoints.push_back(vec3(-0.3, 0.3, 0.95));
+		controlPoints.push_back(vec3(-0.3, -0.3, 0.95));
+		controlPoints.push_back(vec3(0.3, -0.3, 0.95));
+		controlPoints.push_back(vec3(0.55, 0.55, 0.95));
+		controlPoints.push_back(vec3(-0.55, 0.55, 0.95));
+		controlPoints.push_back(vec3(-0.55, -0.55, 0.95));
+		controlPoints.push_back(vec3(0.55, -0.55, 0.95));
+
+
 		if(depth > 5){
 			return La;
 		}
 
 		Hit hit = firstIntersect(ray);
-		if (hit.t < 0) return La;
+		if (hit.t < 0) return La + Le * powf(dot(ray.dir, lightDirection), 10);
 
 		vec3 outRadiance(0,0,0);
 
@@ -624,8 +681,7 @@ public:
 					outRadiance = outRadiance + light->Le * hit.material->kd * cosTheta;
 					vec3 halfway = normalize(-ray.dir + light->direction);
 					float cosDelta = dot(hit.normal, halfway);
-					if (cosDelta > 0) outRadiance = outRadiance + light->Le * hit.material->ks *
-																  powf(cosDelta, hit.material->shininess);
+					if (cosDelta > 0) outRadiance = outRadiance + light->Le * hit.material->ks * powf(cosDelta, hit.material->shininess);
 				}
 			}
 		}
@@ -723,14 +779,6 @@ void onInitialization() {
 // Window has become invalid: Redraw
 void onDisplay() {
 	fullScreenTexturedQuad->Draw();
-	vec4 n(2,1,3,1);
-	vec4 n2(2,2,2,2);
-	mat4 a(vec4(1,0,0,0), vec4(0,1,0,0), vec4(0,0,1,0), vec4(0,0,0,1));
-
-	vec4 aa = n * a * n2;
-
-	printf("x: %f, y: %f, z: %f, w: %f\n", aa.x, aa.y, aa.z, aa.w);
-
 	glutSwapBuffers();									// exchange the two buffers
 }
 
