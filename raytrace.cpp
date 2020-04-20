@@ -99,8 +99,6 @@ class Quadratic : public Intersectable{
 	vec3 radius;
 
 
-
-
 protected:
 	float f(vec4 r){
 		return dot(r * Q, r);
@@ -244,6 +242,7 @@ public:
 		vec4 r = vec4(hit.position.x, hit.position.y, hit.position.z, 1);
 		vec3 g = gradf(r);
 		hit.normal = normalize(vec3(g.x, g.y, g.z));
+		if (dot(hit.normal, ray.dir) > 0) hit.normal = hit.normal * (-1);
 		hit.material = material;
 		return hit;
 
@@ -432,6 +431,7 @@ public:
 		vec4 r = vec4(hit.position.x, hit.position.y, hit.position.z, 1);
 		vec3 g = gradf(r);
 		hit.normal = normalize(vec3(g.x, g.y, g.z));
+		if (dot(hit.normal, ray.dir) > 0) hit.normal = hit.normal * (-1);
 		hit.material = material;
 		return hit;
 
@@ -517,6 +517,7 @@ public:
 		vec4 r = vec4(hit.position.x, hit.position.y, hit.position.z, 1);
 		vec3 g = gradf(r);
 		hit.normal = normalize(vec3(g.x, g.y, g.z));
+		if (dot(hit.normal, ray.dir) > 0) hit.normal = hit.normal * (-1);
 		hit.material = material;
 		return hit;
 
@@ -568,17 +569,17 @@ class Scene {
 public:
 	void build() {
 
-		vec3 eye = vec3(0,1.8, 0), vup = vec3(0, 0, 1), lookat = vec3(0, 0, 0);
+		vec3 eye = vec3(0,1.8, 0.4), vup = vec3(0, 0, 1), lookat = vec3(0, 0, 0);
 		float fov = 90 * M_PI / 180;
 		camera.set(eye, lookat, vup, fov);
 
 		La = vec3(0.4f, 0.4f, 0.6f);
 		Le = vec3(2, 2, 2);
-		lightDirection = vec3(2, 2, 2);
+		lightDirection = vec3(4, 4, 4);
 		lights.push_back(new Light(lightDirection, Le));
 
 		vec3 kd(0.3f, 0.2f, 1.0f), ks(1, 1, 1);
-		vec3 kd2(0.3f, 0.2f, 0.1f), ks2(1, 1, 1);
+		vec3 kd2(0.4f, 0.25f, 0.1f), ks2(1, 1, 1);
 		vec3 kd3(0.8f, 0.1f, 0.1f), ks3(1, 1, 1);
 
 		Material * material1 = new RoughMaterial(kd, ks, 50);
@@ -590,36 +591,26 @@ public:
 
 		vec3 n2(0.14, 0.16, 0.13), kappa2(4.1, 2.3, 3.1);
 		Material * silver = new ReflectiveMaterial(n2, kappa2);
-
+		objects.push_back(new class Hyperboloid(vec3(0.0f, 0.0f, -0.95f),  vec3(0.6244f, 0.6244f, 1.0f), silver, Hyperboloid, vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 0.0f, 0.95f)));
 		objects.push_back(new class Room(vec3(0.0f, 0.0f, 0.0f),  vec3(2.0f, 2.0f, 1.0f), material2, Ellipsoid, vec3(0,0, 0.95)));
 
 
-		objects.push_back(new class Cylinder(vec3(0.5f, -0.1f, -0.2f),  vec3(0.1f, 0.1f, 0.1f), material1, Cylinder, vec3(0,0, 0.3),vec3(0,0, -0.5)));
-		objects.push_back(new class Cylinder(vec3(-0.5f, -0.1f, -0.2f),  vec3(0.1f, 0.1f, 0.1f), material1, Cylinder, vec3(0,0, 0.3),vec3(0,0, -0.5)));
+		objects.push_back(new class Cylinder(vec3(0.6f, 0.7f, -0.2f),  vec3(0.15f, 0.15f, 0.15f), material1, Cylinder, vec3(0,0, 0.37),vec3(0,0, -0.5)));
+		objects.push_back(new class Cylinder(vec3(-0.7f, -0.8f, -0.4f),  vec3(0.15f, 0.15f, 0.15f), material1, Cylinder, vec3(0,0, 0.35),vec3(0,0, -0.5)));
 
 		objects.push_back(new class Paraboloid(vec3(0.0f, 0.0f, -0.5f),  vec3(0.6f, 0.6f, 1.0f), gold, Paraboloid, vec3(0,0, -0.5)));
 
-		objects.push_back(new class Quadratic(vec3(0.0f, -0.6f, 0.5f),  vec3(0.4f, 0.2f, 0.2f), material3, Ellipsoid));
+		objects.push_back(new class Quadratic(vec3(0.42f, -0.65f, 0.5f),  vec3(0.4f, 0.2f, 0.2f), material3, Ellipsoid));
 
 
-		objects.push_back(new class Hyperboloid(vec3(0.0f, 0.0f, -0.95f),  vec3(0.6244f, 0.6244f, 1.0f), silver, Hyperboloid, vec3(0.0f, 0.0f, 2.0f), vec3(0.0f, 0.0f, 0.95f)));
 
-		for(int i = 0; i < 10; i++){
+
+		for(int i = 0; i < 15; i++){
 			controlPoints.push_back(vec3(rnd() * 0.62f, rnd() * 0.62f, 0.95));
-		}
-		for(int i = 0; i < 10; i++){
 			controlPoints.push_back(vec3(-rnd() * 0.62f, rnd() * 0.62f, 0.95));
-		}
-		for(int i = 0; i < 10; i++){
 			controlPoints.push_back(vec3(rnd() * 0.62f, -rnd() * 0.62f, 0.95));
-		}
-		for(int i = 0; i < 10; i++){
 			controlPoints.push_back(vec3(-rnd() * 0.62f, -rnd() * 0.62f, 0.95));
 		}
-
-
-		//controlPoints.push_back(vec3(0,0,0.95));
-
 	}
 
 	void render(std::vector<vec4>& image) {
@@ -643,9 +634,11 @@ public:
 	}
 
 	bool shadowIntersect(Ray ray) {    // for directional lights
+		int cnt = 0;
 		for (Intersectable *object : objects) {
-			if( object->intersect(ray).t > 0)
+			if(object->intersect(ray).t > 0 && cnt != 0)
 				return true;
+			cnt++;
 		}
 		return false;
 	}
@@ -654,14 +647,12 @@ public:
 
 	vec3 trace(Ray ray, int depth = 0) {
 
-
-
 		if(depth > 10){
 			return La;
 		}
 
 		Hit hit = firstIntersect(ray);
-		if (hit.t < 0) return La + Le * powf(dot(ray.dir, normalize(lightDirection - ray.start)), 10);
+		if (hit.t < 0) return La * 2 + Le * powf(dot(ray.dir, normalize(lightDirection - ray.start)), 10);
 
 		vec3 outRadiance(0,0,0);
 
@@ -679,14 +670,13 @@ public:
 					float omegaDelta = (M_PI * 0.62f * 0.62f / controlPoints.size()) * (cosBeta / powf(r, 2));
 
 					if (cosTheta > 0 && !shadowIntersect(shadowRay)) {    // shadow computation
- 						vec3 halfway = normalize(-ray.dir + lightDir);
+						vec3 halfway = normalize(-ray.dir + lightDir);
 						float cosDelta = dot(hit.normal, halfway);
 						outRadiance = outRadiance + light->Le * hit.material->kd * cosTheta * omegaDelta;
 
 						if (cosDelta > 0) {
 							outRadiance = outRadiance + light->Le * hit.material->ks * powf(cosDelta, hit.material->shininess) * omegaDelta;
 						}
-
 						outRadiance = outRadiance + trace(shadowRay, depth++) * omegaDelta;
 					}
 
