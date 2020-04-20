@@ -605,7 +605,7 @@ public:
 
 
 
-		for(int i = 0; i < 15; i++){
+		for(int i = 0; i < 25; i++){
 			controlPoints.push_back(vec3(rnd() * 0.62f, rnd() * 0.62f, 0.95));
 			controlPoints.push_back(vec3(-rnd() * 0.62f, rnd() * 0.62f, 0.95));
 			controlPoints.push_back(vec3(rnd() * 0.62f, -rnd() * 0.62f, 0.95));
@@ -652,7 +652,7 @@ public:
 		}
 
 		Hit hit = firstIntersect(ray);
-		if (hit.t < 0) return La * 2 + Le * powf(dot(ray.dir, normalize(lightDirection - ray.start)), 10);
+		if (hit.t < 0) return La + Le * powf(dot(ray.dir, normalize(lightDirection - ray.start)), 10);
 
 		vec3 outRadiance(0,0,0);
 
